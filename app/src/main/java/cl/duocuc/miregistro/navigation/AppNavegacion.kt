@@ -9,12 +9,16 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import cl.duocuc.miregistro.model.Colaborador
+import cl.duocuc.miregistro.model.ModoTema
 import cl.duocuc.miregistro.ui.screens.*
 import cl.duocuc.miregistro.viewmodel.TiendaViewModel
 import cl.duocuc.miregistro.viewmodel.UsuariosViewModel
 
 @Composable
-fun AppNavegacion() {
+fun AppNavegacion(
+    modoTema: ModoTema,
+    onCambiarModoTema: (ModoTema) -> Unit
+) {
     val navController = rememberNavController()
 
     val usuariosViewModel: UsuariosViewModel = viewModel()
@@ -43,7 +47,9 @@ fun AppNavegacion() {
                         popUpTo(Ruta.Login.ruta) { inclusive = true }
                     }
                 },
-                validarCodigo = tiendaViewModel::validarColaborador
+                validarCodigo = tiendaViewModel::validarColaborador,
+                modoTema = modoTema,
+                onCambiarModoTema = onCambiarModoTema
             )
         }
 

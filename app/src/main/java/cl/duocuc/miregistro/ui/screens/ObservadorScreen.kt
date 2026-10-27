@@ -8,16 +8,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import cl.duocuc.miregistro.model.Colaborador
 import cl.duocuc.miregistro.model.RegistroPersona
 import cl.duocuc.miregistro.model.Sesion
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ObservadorScreen(
+    colaborador: Colaborador,
     sesion: Sesion?,
     registros: List<RegistroPersona>,
     onRegistrar: (String, String, String, Boolean, String?) -> Unit,
@@ -36,13 +38,23 @@ fun ObservadorScreen(
             (!isTransito || accesoDestino != null)
 
     if (sesion == null) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("No hay sesión activa", fontSize = 20.sp, color = MaterialTheme.colorScheme.onBackground)
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Box(modifier = Modifier.fillMaxSize().padding(32.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    text = "No hay sesión activa\n\nPídele a tu supervisor que programe una sesión.",
+                    fontSize = 20.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
         return
     }
 
-    // ENVOLVEMOS TODA LA PANTALLA EN UN SURFACE OSCURO
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -54,16 +66,14 @@ fun ObservadorScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // CABECERA
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
                     Text("Sesión: ${sesion.numero} | Acceso: ${sesion.codigoAcceso}", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                    Text("Observador: Tamara Rojas (C-05)", fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                    Text("Observador: ${colaborador.nombre} (${colaborador.codigo})", fontSize = 16.sp, color = MaterialTheme.colorScheme.onPrimaryContainer)
                     Text("Registros: ${registros.size}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = MaterialTheme.colorScheme.primary)
                 }
             }
 
-            // 1. CLASIFICACIÓN
             Text("1. Clasificación", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChipGrande(texto = "Tránsito", seleccionado = clasificacion == "TRANSITO") { clasificacion = "TRANSITO" }
@@ -71,7 +81,6 @@ fun ObservadorScreen(
                 ChipGrande(texto = "No visto", seleccionado = clasificacion == "NO_DETERMINADO") { clasificacion = "NO_DETERMINADO" }
             }
 
-            // 2. RANGO ETARIO
             Text("2. Edad Aproximada", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChipGrande(texto = "< 18", seleccionado = rangoEtario == "MENOR_18") { rangoEtario = "MENOR_18" }
@@ -81,7 +90,6 @@ fun ObservadorScreen(
                 ChipGrande(texto = "61+", seleccionado = rangoEtario == "61_MAS") { rangoEtario = "61_MAS" }
             }
 
-            // 3. COMPAÑÍA
             Text("3. Compañía", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChipGrande(texto = "Solo", seleccionado = compania == "SOLO") { compania = "SOLO" }
@@ -90,14 +98,12 @@ fun ObservadorScreen(
                 ChipGrande(texto = "Grupo", seleccionado = compania == "GRUPO") { compania = "GRUPO" }
             }
 
-            // 4. COMPRAS DE OTRA TIENDA
             Text("4. ¿Trae compras de otra tienda?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onBackground)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ChipGrande(texto = "Sí", seleccionado = traeCompras == true) { traeCompras = true }
                 ChipGrande(texto = "No", seleccionado = traeCompras == false) { traeCompras = false }
             }
 
-            // 5. DESTINO
             if (isTransito) {
                 Text("5. ¿Hacia qué acceso se dirige?", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -111,7 +117,6 @@ fun ObservadorScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // BOTÓN REGISTRAR (Gigante)
             Button(
                 onClick = {
                     onRegistrar(clasificacion, rangoEtario, compania, traeCompras!!, accesoDestino)
@@ -128,7 +133,6 @@ fun ObservadorScreen(
                 Text("REGISTRAR PERSONA", fontSize = 20.sp, fontWeight = FontWeight.Bold)
             }
 
-            // BOTONES DE CONTROL
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)

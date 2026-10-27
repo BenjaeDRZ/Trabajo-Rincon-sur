@@ -17,6 +17,8 @@ fun MenuPrincipalScreen(
     onVerSupervisor: () -> Unit,
     onVerIndicadores: () -> Unit,
     onVerEventos: () -> Unit,
+    onProgramarSesion: () -> Unit,
+    onVerUbicacion: () -> Unit,
     onCerrarSesion: () -> Unit
 ) {
     val perfil = colaborador.codigoPuesto
@@ -49,6 +51,11 @@ fun MenuPrincipalScreen(
                     Text("Módulo Supervisor", fontSize = 16.sp)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+
+                Button(onClick = onProgramarSesion, modifier = Modifier.fillMaxWidth().height(56.dp)) {
+                    Text("Programar Sesión", fontSize = 16.sp)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             if (puedeVerIndicadores) {
@@ -63,6 +70,10 @@ fun MenuPrincipalScreen(
                     Text("Registrar Eventos", fontSize = 16.sp)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Button(onClick = onVerUbicacion, modifier = Modifier.fillMaxWidth().height(56.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.secondary)) {
+                Text("Ubicación GPS / Maps", fontSize = 16.sp)
             }
 
             Spacer(modifier = Modifier.height(32.dp))

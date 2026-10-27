@@ -12,7 +12,6 @@ import cl.duocuc.miregistro.model.Colaborador
 import cl.duocuc.miregistro.model.ModoTema
 import cl.duocuc.miregistro.ui.screens.*
 import cl.duocuc.miregistro.viewmodel.TiendaViewModel
-import cl.duocuc.miregistro.viewmodel.UsuariosViewModel
 
 @Composable
 fun AppNavegacion(
@@ -21,12 +20,8 @@ fun AppNavegacion(
 ) {
     val navController = rememberNavController()
 
-    val usuariosViewModel: UsuariosViewModel = viewModel()
     val tiendaViewModel: TiendaViewModel = viewModel()
 
-    val usuarioActual by usuariosViewModel.usuarioActual.collectAsStateWithLifecycle()
-    val usuarios by usuariosViewModel.usuarios.collectAsStateWithLifecycle()
-    val filtro by usuariosViewModel.filtro.collectAsStateWithLifecycle()
 
     var colaboradorLogueado by remember { mutableStateOf<Colaborador?>(null) }
 
@@ -35,7 +30,9 @@ fun AppNavegacion(
 
     var sesionParaRevisar by remember { mutableStateOf(tiendaViewModel.obtenerSesionParaRevisar()) }
     var registrosParaRevisar by remember { mutableStateOf(tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")) }
-    var metricasDia by remember { mutableStateOf<Map<String, Any>>(emptyMap()) }
+
+    var fechaConsulta by remember { mutableStateOf("2026-09-15") }
+    var metricasDia by remember { mutableStateOf(tiendaViewModel.obtenerMetricasDia(fechaConsulta)) }
 
     NavHost(navController = navController, startDestination = Ruta.Login.ruta) {
 
@@ -58,20 +55,22 @@ fun AppNavegacion(
             if (colab != null) {
                 MenuPrincipalScreen(
                     colaborador = colab,
-                    onVerObservador = { navController.navigate(Ruta.Observador.ruta) },
+                    onVerObservador = {
+                        tiendaViewModel.cargarSesionObservador(colab.codigo)
+                        navController.navigate(Ruta.Observador.ruta)
+                    },
                     onVerSupervisor = {
-                        tiendaViewModel.finalizarSesionActual()
                         sesionParaRevisar = tiendaViewModel.obtenerSesionParaRevisar()
                         registrosParaRevisar = tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")
                         navController.navigate(Ruta.Supervisor.ruta)
                     },
                     onVerIndicadores = {
-                        metricasDia = tiendaViewModel.obtenerMetricasDia("2026-09-15", "S-0001")
+                        metricasDia = tiendaViewModel.obtenerMetricasDia(fechaConsulta)
                         navController.navigate(Ruta.Indicadores.ruta)
                     },
-                    onVerEventos = {
-                        navController.navigate(Ruta.Eventos.ruta)
-                    },
+                    onVerEventos = { navController.navigate(Ruta.Eventos.ruta) },
+                    onProgramarSesion = { navController.navigate(Ruta.ProgramarSesion.ruta) },
+                    onVerUbicacion = { navController.navigate(Ruta.Ubicacion.ruta) },
                     onCerrarSesion = {
                         colaboradorLogueado = null
                         navController.navigate(Ruta.Login.ruta) {
@@ -83,18 +82,22 @@ fun AppNavegacion(
         }
 
         composable(Ruta.Observador.ruta) {
-            ObservadorScreen(
-                sesion = sesionActual,
-                registros = registros,
-                onRegistrar = { clasificacion, edad, compania, compras, destino ->
-                    tiendaViewModel.registrarPersona(clasificacion, edad, compania, compras, destino)
-                },
-                onAnularUltimo = { tiendaViewModel.anularUltimoRegistro() },
-                onFinalizarSesion = {
-                    tiendaViewModel.finalizarSesionActual()
-                    navController.navigateUp()
-                }
-            )
+            val colab = colaboradorLogueado
+            if (colab != null) {
+                ObservadorScreen(
+                    colaborador = colab,
+                    sesion = sesionActual,
+                    registros = registros,
+                    onRegistrar = { clasificacion, edad, compania, compras, destino ->
+                        tiendaViewModel.registrarPersona(clasificacion, edad, compania, compras, destino)
+                    },
+                    onAnularUltimo = { tiendaViewModel.anularUltimoRegistro() },
+                    onFinalizarSesion = {
+                        tiendaViewModel.finalizarSesionActual()
+                        navController.navigateUp()
+                    }
+                )
+            }
         }
 
         composable(Ruta.Supervisor.ruta) {
@@ -118,9 +121,24 @@ fun AppNavegacion(
             }
         }
 
+        composable(Ruta.ProgramarSesion.ruta) {
+            ProgramarSesionScreen(
+                onGuardar = { numero, acceso, fecha, inicio, termino, observador ->
+                    tiendaViewModel.programarSesion(numero, acceso, fecha, inicio, termino, observador)
+                    navController.navigateUp()
+                },
+                onVolver = { navController.navigateUp() }
+            )
+        }
+
         composable(Ruta.Indicadores.ruta) {
             IndicadoresScreen(
                 metricas = metricasDia,
+                fechaActual = fechaConsulta,
+                onFechaCambiada = { nuevaFecha ->
+                    fechaConsulta = nuevaFecha
+                    metricasDia = tiendaViewModel.obtenerMetricasDia(nuevaFecha)
+                },
                 onVolver = { navController.navigateUp() }
             )
         }
@@ -134,57 +152,9 @@ fun AppNavegacion(
             )
         }
 
-        // --- PANTALLAS DE TU PLANTILLA ORIGINAL ---
-        composable(Ruta.Formulario.ruta) {
-            FormularioScreen(
-                onRegistroExitoso = { usuario ->
-                    usuariosViewModel.registrar(usuario)
-                    navController.navigate(Ruta.Perfil.ruta)
-                },
-                usuarioActual = usuarioActual,
-                onVerMiPerfil = { navController.navigate(Ruta.Perfil.ruta) },
-                onVerUsuarios = { navController.navigate(Ruta.Usuarios.ruta) },
-                onCerrarSesion = { usuariosViewModel.cerrarSesion() }
-            )
+        composable(Ruta.Ubicacion.ruta) {
+            UbicacionScreen(onVolver = { navController.navigateUp() })
         }
 
-        composable(Ruta.Perfil.ruta) {
-            PerfilScreen(
-                usuario = usuarioActual,
-                onVolver = { navController.navigateUp() },
-                onFotoTomada = usuariosViewModel::cambiarAvatarDesdeCamara,
-                onImagenElegida = usuariosViewModel::cambiarAvatarDesdeGaleria
-            )
-        }
-
-        composable(Ruta.Usuarios.ruta) {
-            UsuariosScreen(
-                usuarios = usuarios,
-                onVolver = { navController.navigateUp() },
-                onEditar = { id -> navController.navigate(Ruta.Editar.crear(id)) },
-                filtro = filtro,
-                onBuscar = usuariosViewModel::buscar,
-                onEliminar = usuariosViewModel::eliminar
-            )
-        }
-
-        composable(
-            route = Ruta.Editar.ruta,
-            arguments = listOf(navArgument("id") { type = NavType.LongType })
-        ) { entrada ->
-            val id = entrada.arguments?.getLong("id") ?: 0L
-            val usuario = remember(id) { usuariosViewModel.obtener(id) }
-            if (usuario != null) {
-                EditarScreen(
-                    usuario = usuario,
-                    roles = usuariosViewModel.roles,
-                    onVolver = { navController.navigateUp() },
-                    onGuardar = { editado ->
-                        usuariosViewModel.actualizar(editado)
-                        navController.navigateUp()
-                    }
-                )
-            }
-        }
     }
 }

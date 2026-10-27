@@ -1,13 +1,13 @@
 package cl.duocuc.miregistro.model
 
 data class Colaborador(
-    val codigo: String,        // C-01
-    val nombre: String,        // Carolina Fuentes Araya
-    val rut: String,           // 15.234.871-1
-    val cargo: String,         // Jefa de tienda
-    val codigoPuesto: String,  // P-01
-    val email: String,         // carolina.fuentes@rinconsur-ficticio.ejemplo
-    val telefono: String       // +56 9 0000 0011
+    val codigo: String,        
+    val nombre: String,        
+    val rut: String,           
+    val cargo: String,         
+    val codigoPuesto: String,  
+    val email: String,         
+    val telefono: String       
 )
 
 val colaboradores = listOf(

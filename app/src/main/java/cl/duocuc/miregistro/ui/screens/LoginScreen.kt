@@ -23,7 +23,7 @@ fun LoginScreen(
     var codigo by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
 
-    // Surface asegura que el fondo sea el correcto según el tema (claro u oscuro)
+    
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -36,7 +36,7 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Título con color explícito del tema
+                
                 Text(
                     text = "Rincón Sur",
                     style = MaterialTheme.typography.headlineLarge,
@@ -98,7 +98,7 @@ fun LoginScreen(
                 }
             }
 
-            // Selector de apariencia discreto en la esquina superior derecha
+            
             SelectorTema(
                 modoActual = modoTema,
                 onCambiar = onCambiarModoTema,

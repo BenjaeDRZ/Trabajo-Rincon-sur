@@ -13,9 +13,9 @@ class UsuarioDbHelper(context: Context) :
 
     companion object {
         private const val NOMBRE_BD = "miregistro.db"
-        // NUEVO (Avatar): la versión sube de 1 a 2 porque la tabla usuarios CAMBIA
-        // (tiene una columna nueva). Así Android ejecuta onUpgrade en los teléfonos
-        // que ya tenían la app instalada con la versión 1.
+        
+        
+        
         private const val VERSION_BD = 2
 
         private const val TABLA_ROLES = "roles"
@@ -28,7 +28,7 @@ class UsuarioDbHelper(context: Context) :
         private const val USU_CORREO = "correo"
         private const val USU_CIUDAD = "ciudad"
         private const val USU_ROL = "id_rol"
-        // NUEVO (Avatar): columna donde se guarda la foto
+        
         private const val USU_AVATAR = "avatar"
 
         private const val SQL_CREAR_ROLES =
@@ -42,13 +42,13 @@ class UsuarioDbHelper(context: Context) :
                 "$USU_NOMBRE TEXT NOT NULL, " +
                 "$USU_CORREO TEXT NOT NULL, " +
                 "$USU_CIUDAD TEXT NOT NULL, " +
-                // NUEVO (Avatar): BLOB = "Binary Large OBject": guarda bytes tal cual (una imagen).
-                // Sin NOT NULL: puede quedar vacía (null) si el usuario no elige foto.
+                
+                
                 "$USU_AVATAR BLOB, " +
                 "$USU_ROL INTEGER NOT NULL REFERENCES $TABLA_ROLES($ROL_ID))"
 
-        // NUEVO (Avatar): migración de la versión 1 a la 2.
-        // ALTER TABLE agrega la columna SIN borrar las filas que ya existen.
+        
+        
         private const val SQL_AGREGAR_AVATAR =
             "ALTER TABLE $TABLA_USUARIOS ADD COLUMN $USU_AVATAR BLOB"
 
@@ -82,15 +82,15 @@ class UsuarioDbHelper(context: Context) :
         db.execSQL(SQL_PRECARGAR_USUARIOS)
     }
 
-    // NUEVO (Avatar): antes onUpgrade borraba todo (DROP TABLE). Ahora MIGRA:
-    // solo aplica los cambios que le faltan a la BD instalada y conserva los datos.
-    //   - Instalación nueva          -> onCreate (la tabla ya trae la columna avatar)
-    //   - Tenía la versión 1 -> 2    -> onUpgrade agrega solo la columna
+    
+    
+    
+    
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
         if (oldVersion < 2) {
             db.execSQL(SQL_AGREGAR_AVATAR)
         }
-        // Próxima migración: if (oldVersion < 3) { ... }
+        
     }
 
     fun listarRoles(): List<Rol> {
@@ -137,9 +137,9 @@ class UsuarioDbHelper(context: Context) :
     fun eliminarUsuario(id: Long): Int =
         writableDatabase.delete(TABLA_USUARIOS, "$USU_ID = ?", arrayOf(id.toString()))
 
-    // NUEVO (Avatar): UPDATE de UNA sola columna. ContentValues acepta ByteArray
-    // y SQLite lo guarda como BLOB. No toca nombre, correo, ciudad ni rol.
-    // (Por eso valoresDe() NO incluye el avatar: al editar datos la foto se conserva).
+    
+    
+    
     fun actualizarAvatar(id: Long, avatar: ByteArray): Int {
         val valores = ContentValues().apply { put(USU_AVATAR, avatar) }
         return writableDatabase.update(TABLA_USUARIOS, valores, "$USU_ID = ?", arrayOf(id.toString()))
@@ -169,8 +169,8 @@ class UsuarioDbHelper(context: Context) :
         id = cursor.getLong(cursor.getColumnIndexOrThrow(USU_ID)),
         rolId = cursor.getLong(cursor.getColumnIndexOrThrow(USU_ROL)),
         rolNombre = cursor.getString(cursor.getColumnIndexOrThrow(ROL_NOMBRE)),
-        // NUEVO (Avatar): getBlob() lee los bytes. Si la columna está vacía (NULL)
-        // se devuelve null; getBlob sobre un NULL no sirve para mostrar una imagen.
+        
+        
         avatar = cursor.getColumnIndexOrThrow(USU_AVATAR).let { columna ->
             if (cursor.isNull(columna)) null else cursor.getBlob(columna)
         }

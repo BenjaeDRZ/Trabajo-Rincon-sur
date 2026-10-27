@@ -20,7 +20,7 @@ fun SupervisorScreen(
     supervisorLogueado: Colaborador,
     sesion: Sesion?,
     registros: List<RegistroPersona>,
-    onValidar: (Boolean, String?) -> Unit, // (esRechazo, motivo)
+    onValidar: (Boolean, String?) -> Unit, 
     onVolver: () -> Unit
 ) {
     var mostrarDialogoRechazo by remember { mutableStateOf(false) }
@@ -61,7 +61,7 @@ fun SupervisorScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // BOTÓN VALIDAR
+            
             Button(
                 onClick = {
                     if (registros.size < 30) {
@@ -78,7 +78,7 @@ fun SupervisorScreen(
                 Text("VALIDAR SESIÓN", fontSize = 18.sp, fontWeight = FontWeight.Bold)
             }
 
-            // BOTÓN RECHAZAR
+            
             OutlinedButton(
                 onClick = {
                     if (sesion.observador == supervisorLogueado.codigo) {
@@ -99,7 +99,7 @@ fun SupervisorScreen(
         }
     }
 
-    // Diálogo para ingresar el motivo del rechazo
+    
     if (mostrarDialogoRechazo) {
         AlertDialog(
             onDismissRequest = { mostrarDialogoRechazo = false },

@@ -8,10 +8,9 @@ import cl.duocuc.miregistro.model.RegistroPersona
 import cl.duocuc.miregistro.model.Sesion
 
 class TiendaDbHelper(context: Context) :
-    SQLiteOpenHelper(context, "rinconsur.db", null, 3) { // Versión 3
+    SQLiteOpenHelper(context, "rinconsur.db", null, 3) {
 
     override fun onCreate(db: SQLiteDatabase) {
-        // 1. Tablas anteriores
         db.execSQL("""
             CREATE TABLE sesiones (
                 numero TEXT PRIMARY KEY, codigoAcceso TEXT, fecha TEXT,
@@ -19,7 +18,6 @@ class TiendaDbHelper(context: Context) :
                 estado TEXT, validador TEXT, motivoRechazo TEXT
             )
         """.trimIndent())
-
         db.execSQL("""
             CREATE TABLE registros (
                 id INTEGER PRIMARY KEY AUTOINCREMENT, numero TEXT, sesion TEXT,
@@ -27,22 +25,14 @@ class TiendaDbHelper(context: Context) :
                 traeCompras INTEGER, accesoDestino TEXT, anulado INTEGER
             )
         """.trimIndent())
-
         db.execSQL("CREATE TABLE conteos (fecha TEXT, codigoAcceso TEXT, cantidad INTEGER)")
         db.execSQL("CREATE TABLE transacciones (fecha TEXT, cantidad INTEGER)")
-
-        // 2. Nueva tabla de Eventos (Fase 5)
         db.execSQL("""
             CREATE TABLE eventos (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, 
-                fecha TEXT, 
-                tipo TEXT, 
-                accesoAfectado TEXT, 
-                descripcion TEXT
+                id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT, tipo TEXT, accesoAfectado TEXT, descripcion TEXT
             )
         """.trimIndent())
 
-        // 3. Precarga de datos
         db.execSQL("INSERT INTO conteos VALUES ('2026-09-15', 'A1', 2040)")
         db.execSQL("INSERT INTO conteos VALUES ('2026-09-15', 'A2', 1105)")
         db.execSQL("INSERT INTO conteos VALUES ('2026-09-15', 'A3', 730)")
@@ -59,7 +49,6 @@ class TiendaDbHelper(context: Context) :
         onCreate(db)
     }
 
-    // --- MÉTODOS EXISTENTES ---
     fun insertarSesion(sesion: Sesion) {
         val values = ContentValues().apply {
             put("numero", sesion.numero); put("codigoAcceso", sesion.codigoAcceso)
@@ -105,6 +94,11 @@ class TiendaDbHelper(context: Context) :
         writableDatabase.insert("registros", null, values)
     }
 
+    fun anularRegistro(numeroRegistro: String) {
+        val values = ContentValues().apply { put("anulado", 1) }
+        writableDatabase.update("registros", values, "numero = ?", arrayOf(numeroRegistro))
+    }
+
     fun obtenerRegistrosPorSesion(sesion: String): List<RegistroPersona> {
         val lista = mutableListOf<RegistroPersona>()
         val cursor = readableDatabase.rawQuery("SELECT * FROM registros WHERE sesion = ? AND anulado = 0", arrayOf(sesion))
@@ -148,29 +142,71 @@ class TiendaDbHelper(context: Context) :
         return total
     }
 
-    // --- MÉTODOS DE EVENTOS (FASE 5) ---
     fun insertarEvento(fecha: String, tipo: String, acceso: String, descripcion: String) {
         val values = ContentValues().apply {
-            put("fecha", fecha)
-            put("tipo", tipo)
-            put("accesoAfectado", acceso)
-            put("descripcion", descripcion)
+            put("fecha", fecha); put("tipo", tipo); put("accesoAfectado", acceso); put("descripcion", descripcion)
         }
         writableDatabase.insert("eventos", null, values)
     }
 
-    fun obtenerEventos(): List<Map<String, String>> {
-        val lista = mutableListOf<Map<String, String>>()
-        val cursor = readableDatabase.rawQuery("SELECT * FROM eventos ORDER BY id DESC", null)
+    fun obtenerIngresosPorAcceso(fecha: String): Map<String, Int> {
+        val mapa = mutableMapOf<String, Int>()
+        val cursor = readableDatabase.rawQuery("SELECT codigoAcceso, SUM(cantidad) FROM conteos WHERE fecha = ? GROUP BY codigoAcceso", arrayOf(fecha))
         while (cursor.moveToNext()) {
-            lista.add(mapOf(
-                "fecha" to cursor.getString(cursor.getColumnIndexOrThrow("fecha")),
-                "tipo" to cursor.getString(cursor.getColumnIndexOrThrow("tipo")),
-                "acceso" to cursor.getString(cursor.getColumnIndexOrThrow("accesoAfectado")),
-                "descripcion" to cursor.getString(cursor.getColumnIndexOrThrow("descripcion"))
-            ))
+            mapa[cursor.getString(0)] = cursor.getInt(1)
         }
         cursor.close()
-        return lista
+        return mapa
+    }
+
+    fun obtenerSesionValidadaPorFecha(fecha: String): Sesion? {
+        val cursor = readableDatabase.rawQuery("SELECT * FROM sesiones WHERE fecha = ? AND estado = 'VALIDADA' LIMIT 1", arrayOf(fecha))
+        return if (cursor.moveToFirst()) {
+            Sesion(
+                numero = cursor.getString(cursor.getColumnIndexOrThrow("numero")),
+                codigoAcceso = cursor.getString(cursor.getColumnIndexOrThrow("codigoAcceso")),
+                fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha")),
+                horaInicioProg = cursor.getString(cursor.getColumnIndexOrThrow("horaInicioProg")),
+                horaTerminoProg = cursor.getString(cursor.getColumnIndexOrThrow("horaTerminoProg")),
+                observador = cursor.getString(cursor.getColumnIndexOrThrow("observador")),
+                estado = cursor.getString(cursor.getColumnIndexOrThrow("estado")),
+                validador = cursor.getString(cursor.getColumnIndexOrThrow("validador")),
+                motivoRechazo = cursor.getString(cursor.getColumnIndexOrThrow("motivoRechazo"))
+            ).also { cursor.close() }
+        } else null
+    }
+
+    fun obtenerSesionProgramada(observador: String): Sesion? {
+        val cursor = readableDatabase.rawQuery("SELECT * FROM sesiones WHERE observador = ? AND estado IN ('PROGRAMADA', 'EN_CURSO') LIMIT 1", arrayOf(observador))
+        return if (cursor.moveToFirst()) {
+            Sesion(
+                numero = cursor.getString(cursor.getColumnIndexOrThrow("numero")),
+                codigoAcceso = cursor.getString(cursor.getColumnIndexOrThrow("codigoAcceso")),
+                fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha")),
+                horaInicioProg = cursor.getString(cursor.getColumnIndexOrThrow("horaInicioProg")),
+                horaTerminoProg = cursor.getString(cursor.getColumnIndexOrThrow("horaTerminoProg")),
+                observador = cursor.getString(cursor.getColumnIndexOrThrow("observador")),
+                estado = cursor.getString(cursor.getColumnIndexOrThrow("estado")),
+                validador = cursor.getString(cursor.getColumnIndexOrThrow("validador")),
+                motivoRechazo = cursor.getString(cursor.getColumnIndexOrThrow("motivoRechazo"))
+            ).also { cursor.close() }
+        } else null
+    }
+
+    fun obtenerUltimaSesionFinalizada(): Sesion? {
+        val cursor = readableDatabase.rawQuery("SELECT * FROM sesiones WHERE estado = 'FINALIZADA' ORDER BY rowid DESC LIMIT 1", null)
+        return if (cursor.moveToFirst()) {
+            Sesion(
+                numero = cursor.getString(cursor.getColumnIndexOrThrow("numero")),
+                codigoAcceso = cursor.getString(cursor.getColumnIndexOrThrow("codigoAcceso")),
+                fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha")),
+                horaInicioProg = cursor.getString(cursor.getColumnIndexOrThrow("horaInicioProg")),
+                horaTerminoProg = cursor.getString(cursor.getColumnIndexOrThrow("horaTerminoProg")),
+                observador = cursor.getString(cursor.getColumnIndexOrThrow("observador")),
+                estado = cursor.getString(cursor.getColumnIndexOrThrow("estado")),
+                validador = cursor.getString(cursor.getColumnIndexOrThrow("validador")),
+                motivoRechazo = cursor.getString(cursor.getColumnIndexOrThrow("motivoRechazo"))
+            ).also { cursor.close() }
+        } else null
     }
 }

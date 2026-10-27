@@ -2,7 +2,6 @@ package cl.duocuc.miregistro.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Paleta "Bosque nocturno": verde pino, marfil y latón
 val Primario = Color(0xFF1F3A2E)
 val PrimarioOscuro = Color(0xFF142A20)
 val PrimarioClaro = Color(0xFFDCE6DF)

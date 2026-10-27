@@ -16,7 +16,7 @@ class TemaPreferencias(context: Context) {
         prefs.edit { putString(CLAVE_MODO, modo.name) }
     }
 
-    // Si no hay nada guardado (o el valor no es válido) se sigue al sistema
+    
     fun leer(): ModoTema =
         ModoTema.entries.find { it.name == prefs.getString(CLAVE_MODO, null) } ?: ModoTema.SISTEMA
 }

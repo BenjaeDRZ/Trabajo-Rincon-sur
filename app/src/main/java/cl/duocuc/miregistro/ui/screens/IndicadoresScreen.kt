@@ -4,7 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -12,23 +12,40 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun IndicadoresScreen(
     metricas: Map<String, Any>,
+    fechaActual: String,
+    onFechaCambiada: (String) -> Unit,
     onVolver: () -> Unit
 ) {
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background
-    ) {
+    var fechaInput by remember { mutableStateOf(fechaActual) }
+    val porAcceso = metricas["porAcceso"] as? Map<*, *> ?: emptyMap<Any, Any>()
+    val perfil = metricas["perfil"] as? Map<*, *> ?: emptyMap<Any, Any>()
+
+    Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp).verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("Indicadores del Día", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Text("Fecha evaluada: 15-09-2026", color = MaterialTheme.colorScheme.onBackground)
+            Text("Indicadores Históricos", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
-            // TARJETA 1: FLUJO Y VENTAS
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = fechaInput,
+                    onValueChange = { fechaInput = it },
+                    label = { Text("Fecha (AAAA-MM-DD)") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = { onFechaCambiada(fechaInput) }, modifier = Modifier.height(56.dp)) {
+                    Text("Buscar")
+                }
+            }
+
+            Text("Resumen del día: $fechaActual", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
+
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Flujo y Ventas", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
@@ -48,7 +65,18 @@ fun IndicadoresScreen(
                 }
             }
 
-            // TARJETA 2: ANÁLISIS DE TRÁNSITO
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ingresos por Acceso", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                    listOf("A1", "A2", "A3", "A4").forEach { acceso ->
+                        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                            Text("Acceso $acceso:")
+                            Text("${porAcceso[acceso] ?: 0} pers.", fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Análisis de Tránsito", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
@@ -71,6 +99,15 @@ fun IndicadoresScreen(
                         val convReal = metricas["conversionSinTransito"] as Double
                         Text(String.format(Locale.US, "%.1f %%", convReal), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
+                }
+            }
+
+            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Perfil del Tránsito (RF-11)", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
+                    Text("Edades: ${perfil["edades"]}", fontSize = 14.sp)
+                    Text("Compañía: ${perfil["compania"]}", fontSize = 14.sp)
+                    Text("Compras: ${perfil["compras"]}", fontSize = 14.sp)
                 }
             }
 

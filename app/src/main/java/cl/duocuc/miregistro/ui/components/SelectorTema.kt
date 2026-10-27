@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import cl.duocuc.miregistro.R
 import cl.duocuc.miregistro.model.ModoTema
 
-// Ícono discreto que abre un menú con las opciones de apariencia
+
 @Composable
 fun SelectorTema(
     modoActual: ModoTema,

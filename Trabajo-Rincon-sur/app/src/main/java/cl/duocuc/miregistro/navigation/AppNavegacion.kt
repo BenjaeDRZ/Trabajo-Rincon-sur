@@ -44,7 +44,7 @@ fun AppNavegacion(
                         popUpTo(Ruta.Login.ruta) { inclusive = true }
                     }
                 },
-                validarCodigo = tiendaViewModel::validarColaborador,
+                iniciarSesion = tiendaViewModel::iniciarSesion,
                 modoTema = modoTema,
                 onCambiarModoTema = onCambiarModoTema
             )
@@ -73,15 +73,28 @@ fun AppNavegacion(
                     onVerObservador = {
                         tiendaViewModel.cargarSesionObservador(colab.codigo)
                         navController.navigate(Ruta.Observador.ruta)
+                        // Trae sesiones programadas desde ms-operacion y refresca la pantalla
+                        tiendaViewModel.sincronizarConServidor {
+                            if (tiendaViewModel.sesionActual.value == null) {
+                                tiendaViewModel.cargarSesionObservador(colab.codigo)
+                            }
+                        }
                     },
                     onVerSupervisor = {
                         sesionParaRevisar = tiendaViewModel.obtenerSesionParaRevisar()
                         registrosParaRevisar = tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")
                         navController.navigate(Ruta.Supervisor.ruta)
+                        // Trae sesiones finalizadas en otros dispositivos
+                        tiendaViewModel.sincronizarConServidor {
+                            sesionParaRevisar = tiendaViewModel.obtenerSesionParaRevisar()
+                            registrosParaRevisar = tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")
+                        }
                     },
                     onVerIndicadores = {
                         metricasDia = tiendaViewModel.obtenerMetricasDia(fechaConsulta)
                         navController.navigate(Ruta.Indicadores.ruta)
+                        // Conteos desde ms-analitica
+                        tiendaViewModel.cargarMetricasDia(fechaConsulta) { metricasDia = it }
                     },
                     onVerEventos = { navController.navigate(Ruta.Eventos.ruta) },
                     onProgramarSesion = { navController.navigate(Ruta.ProgramarSesion.ruta) },
@@ -215,6 +228,7 @@ fun AppNavegacion(
                 onFechaCambiada = { nuevaFecha ->
                     fechaConsulta = nuevaFecha
                     metricasDia = tiendaViewModel.obtenerMetricasDia(nuevaFecha)
+                    tiendaViewModel.cargarMetricasDia(nuevaFecha) { metricasDia = it }
                 },
                 onVolver = { navController.navigateUp() }
             )

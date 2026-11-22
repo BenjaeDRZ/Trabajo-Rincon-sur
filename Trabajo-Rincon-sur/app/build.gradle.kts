@@ -59,6 +59,11 @@ dependencies {
     // RF-02/RF-03: parseo de reportes CSV/JSON
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
 
+    // Conexión con los microservicios (backend/)
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+
     // Coroutines explícitas
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
 }

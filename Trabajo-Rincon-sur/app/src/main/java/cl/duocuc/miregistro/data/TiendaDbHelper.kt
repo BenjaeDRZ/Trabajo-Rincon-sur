@@ -2,6 +2,7 @@ package cl.duocuc.miregistro.data
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import cl.duocuc.miregistro.model.RegistroPersona
@@ -284,5 +285,81 @@ class TiendaDbHelper(context: Context) :
         }
 
         return if (conDatos == 0) null else sumaProporciones / conDatos
+    }
+
+    // ==========================================================
+    // SINCRONIZACIÓN CON MICROSERVICIOS
+    // ==========================================================
+
+    private fun leerSesion(cursor: Cursor) = Sesion(
+        numero = cursor.getString(cursor.getColumnIndexOrThrow("numero")),
+        codigoAcceso = cursor.getString(cursor.getColumnIndexOrThrow("codigoAcceso")),
+        fecha = cursor.getString(cursor.getColumnIndexOrThrow("fecha")),
+        horaInicioProg = cursor.getString(cursor.getColumnIndexOrThrow("horaInicioProg")),
+        horaTerminoProg = cursor.getString(cursor.getColumnIndexOrThrow("horaTerminoProg")),
+        observador = cursor.getString(cursor.getColumnIndexOrThrow("observador")),
+        estado = cursor.getString(cursor.getColumnIndexOrThrow("estado")),
+        validador = cursor.getString(cursor.getColumnIndexOrThrow("validador")),
+        motivoRechazo = cursor.getString(cursor.getColumnIndexOrThrow("motivoRechazo"))
+    )
+
+    fun obtenerTodasLasSesiones(): List<Sesion> {
+        val lista = mutableListOf<Sesion>()
+        val cursor = readableDatabase.rawQuery("SELECT * FROM sesiones", null)
+        while (cursor.moveToNext()) lista.add(leerSesion(cursor))
+        cursor.close()
+        return lista
+    }
+
+    /** Inserta o reemplaza una sesión que vino desde ms-operacion. */
+    fun guardarSesionDesdeServidor(sesion: Sesion) {
+        val values = ContentValues().apply {
+            put("numero", sesion.numero); put("codigoAcceso", sesion.codigoAcceso)
+            put("fecha", sesion.fecha); put("horaInicioProg", sesion.horaInicioProg)
+            put("horaTerminoProg", sesion.horaTerminoProg); put("observador", sesion.observador)
+            put("estado", sesion.estado); put("validador", sesion.validador)
+            put("motivoRechazo", sesion.motivoRechazo)
+        }
+        writableDatabase.insertWithOnConflict("sesiones", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+    }
+
+    /** Reemplaza los registros locales de una sesión por los que vinieron del servidor. */
+    fun reemplazarRegistrosDeSesion(sesion: String, registros: List<RegistroPersona>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("registros", "sesion = ?", arrayOf(sesion))
+            registros.forEach { r ->
+                val values = ContentValues().apply {
+                    put("numero", r.numero); put("sesion", r.sesion)
+                    put("hora", r.hora); put("clasificacion", r.clasificacion)
+                    put("rangoEtario", r.rangoEtario); put("compania", r.compania)
+                    put("traeCompras", if (r.traeCompras) 1 else 0)
+                    put("accesoDestino", r.accesoDestino); put("anulado", if (r.anulado) 1 else 0)
+                }
+                db.insert("registros", null, values)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
+    /** Reemplaza los conteos de una fecha por los que entrega ms-analitica. */
+    fun reemplazarConteos(fecha: String, porAcceso: Map<String, Int>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.delete("conteos", "fecha = ?", arrayOf(fecha))
+            porAcceso.forEach { (acceso, cantidad) ->
+                val values = ContentValues().apply {
+                    put("fecha", fecha); put("codigoAcceso", acceso); put("cantidad", cantidad)
+                }
+                db.insert("conteos", null, values)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
     }
 }

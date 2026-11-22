@@ -1,11 +1,21 @@
 package cl.duocuc.miregistro.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import cl.duocuc.miregistro.data.TiendaDbHelper
+import cl.duocuc.miregistro.data.remote.CambioEstadoDto
+import cl.duocuc.miregistro.data.remote.LoginRequestDto
+import cl.duocuc.miregistro.data.remote.RegistroDto
+import cl.duocuc.miregistro.data.remote.RetrofitClient
+import cl.duocuc.miregistro.data.remote.SesionDto
 import cl.duocuc.miregistro.model.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,17 +34,152 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
     private val _registros = MutableStateFlow<List<RegistroPersona>>(emptyList())
     val registros: StateFlow<List<RegistroPersona>> = _registros
 
+    /** true si la última llamada a los microservicios funcionó (se puede mostrar en la UI). */
+    private val _servidorConectado = MutableStateFlow(false)
+    val servidorConectado: StateFlow<Boolean> = _servidorConectado
+
+    private val operacionApi get() = RetrofitClient.operacion
+
     init {
         dbHelper.crearSesionDePrueba()
+        sincronizarConServidor()
     }
 
     fun validarColaborador(codigo: String): Colaborador? =
         colaboradores.find { it.codigo == codigo }
 
+    /**
+     * Login contra ms-auth. Si el microservicio no responde (sin red / apagado),
+     * se usa la lista local del prototipo (contraseña 12345) para no bloquear el trabajo en terreno.
+     * onResultado(colaborador, mensajeError)
+     */
+    fun iniciarSesion(codigo: String, contrasena: String, onResultado: (Colaborador?, String?) -> Unit) {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                try {
+                    val resp = RetrofitClient.auth.login(LoginRequestDto(codigo, contrasena))
+                    _servidorConectado.value = true
+                    when {
+                        resp.isSuccessful && resp.body() != null -> resp.body()!!.aModelo() to null
+                        resp.code() == 401 -> null to "Código o contraseña incorrectos"
+                        else -> loginLocal(codigo, contrasena)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "ms-auth no disponible, se usa login local: ${e.message}")
+                    _servidorConectado.value = false
+                    loginLocal(codigo, contrasena)
+                }
+            }
+            onResultado(resultado.first, resultado.second)
+        }
+    }
+
+    private fun loginLocal(codigo: String, contrasena: String): Pair<Colaborador?, String?> {
+        val colaborador = validarColaborador(codigo) ?: return null to "Código no encontrado"
+        if (contrasena != CONTRASENA_LOCAL) return null to "Contraseña incorrecta"
+        return colaborador to null
+    }
+
     fun cargarSesionObservador(codigoObservador: String) {
         val sesion = dbHelper.obtenerSesionProgramada(codigoObservador)
         _sesionActual.value = sesion
         _registros.value = if (sesion != null) dbHelper.obtenerRegistrosPorSesion(sesion.numero) else emptyList()
+    }
+
+    // ==========================================================
+    // SINCRONIZACIÓN CON MICROSERVICIOS (RNF-03: offline + sync)
+    // La BD local (SQLite) sigue siendo la fuente para la UI; los cambios
+    // se envían al servidor apenas ocurren y, si falla, se reenvían en la
+    // próxima sincronización.
+    // ==========================================================
+
+    /** Ejecuta una llamada al servidor en segundo plano sin bloquear la UI. */
+    private fun enviarAlServidor(descripcion: String, accion: suspend () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                accion()
+                _servidorConectado.value = true
+            } catch (e: Exception) {
+                _servidorConectado.value = false
+                Log.w(TAG, "No se pudo $descripcion (queda pendiente para la próxima sincronización): ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Sube a ms-operacion lo que solo existe localmente y baja lo que hay en el servidor
+     * (sesiones programadas por otros dispositivos, validaciones, etc.).
+     */
+    fun sincronizarConServidor(onListo: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val remotas = operacionApi.listarSesiones().mapNotNull { it.aModelo() }.associateBy { it.numero }
+                    val locales = dbHelper.obtenerTodasLasSesiones().associateBy { it.numero }
+
+                    // 1) Subir sesiones locales que el servidor no tiene o tiene más atrasadas
+                    for (local in locales.values) {
+                        val remota = remotas[local.numero]
+                        if (remota == null || nivelEstado(local.estado) > nivelEstado(remota.estado)) {
+                            operacionApi.guardarSesion(SesionDto.de(local))
+                        }
+                        val regsLocales = dbHelper.obtenerRegistrosPorSesion(local.numero)
+                        val regsRemotos = if (remota == null) 0 else operacionApi.registrosDeSesion(local.numero).size
+                        if (regsLocales.size > regsRemotos) {
+                            regsLocales.forEach { operacionApi.guardarRegistro(RegistroDto.de(it)) }
+                        }
+                    }
+
+                    // 2) Bajar sesiones nuevas o más avanzadas desde el servidor
+                    for (remota in remotas.values) {
+                        val local = locales[remota.numero]
+                        if (local == null || nivelEstado(remota.estado) > nivelEstado(local.estado)) {
+                            dbHelper.guardarSesionDesdeServidor(remota)
+                        }
+                        if (remota.estado != "PROGRAMADA") {
+                            val regsRemotos = operacionApi.registrosDeSesion(remota.numero).mapNotNull { it.aModelo() }
+                            if (regsRemotos.size > dbHelper.obtenerRegistrosPorSesion(remota.numero).size) {
+                                dbHelper.reemplazarRegistrosDeSesion(remota.numero, regsRemotos)
+                            }
+                        }
+                    }
+                    _servidorConectado.value = true
+                } catch (e: Exception) {
+                    _servidorConectado.value = false
+                    Log.w(TAG, "Sincronización con ms-operacion falló, se trabaja offline: ${e.message}")
+                }
+            }
+            onListo()
+        }
+    }
+
+    private fun nivelEstado(estado: String?): Int = when (estado) {
+        "PROGRAMADA" -> 0
+        "EN_CURSO" -> 1
+        "FINALIZADA" -> 2
+        "VALIDADA", "RECHAZADA" -> 3
+        else -> -1
+    }
+
+    /**
+     * Trae desde ms-analitica los ingresos por acceso de la fecha, los guarda localmente
+     * y luego entrega las métricas calculadas. Si el servidor no responde, usa lo local.
+     */
+    fun cargarMetricasDia(fecha: String, onListo: (Map<String, Any>) -> Unit) {
+        viewModelScope.launch {
+            val metricas = withContext(Dispatchers.IO) {
+                try {
+                    val porAcceso = RetrofitClient.analitica.ingresosPorAcceso(fecha)
+                    if (porAcceso.isNotEmpty()) dbHelper.reemplazarConteos(fecha, porAcceso)
+                    _servidorConectado.value = true
+                } catch (e: Exception) {
+                    _servidorConectado.value = false
+                    Log.w(TAG, "ms-analitica no disponible, se usan conteos locales: ${e.message}")
+                }
+                obtenerMetricasDia(fecha)
+            }
+            onListo(metricas)
+        }
     }
 
     /**
@@ -59,6 +204,7 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         }
         val nuevaSesion = Sesion(numero, acceso, fecha, horaInicio, horaTermino, observador, "PROGRAMADA")
         dbHelper.insertarSesion(nuevaSesion)
+        enviarAlServidor("enviar la sesión $numero") { operacionApi.guardarSesion(SesionDto.de(nuevaSesion)) }
         return Result.success(Unit)
     }
 
@@ -96,6 +242,7 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         val nuevoRegistro = RegistroPersona(nuevoNumero, sesion.numero, horaActual, clasificacion, rangoEtario, compania, traeCompras, accesoDestino)
         _registros.value = _registros.value + nuevoRegistro
         dbHelper.insertarRegistro(nuevoRegistro)
+        enviarAlServidor("enviar el registro $nuevoNumero") { operacionApi.guardarRegistro(RegistroDto.de(nuevoRegistro)) }
     }
 
     fun anularUltimoRegistro() {
@@ -104,12 +251,16 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
             val ultimo = listaActual.removeAt(listaActual.size - 1)
             _registros.value = listaActual
             dbHelper.anularRegistro(ultimo.numero)
+            enviarAlServidor("anular el registro ${ultimo.numero}") {
+                operacionApi.anularRegistro(ultimo.sesion, ultimo.numero)
+            }
         }
     }
 
     fun finalizarSesionActual() {
         val sesion = _sesionActual.value ?: return
         dbHelper.actualizarEstadoSesion(sesion.numero, "FINALIZADA")
+        enviarEstado(sesion.numero, "FINALIZADA", null, null)
         _sesionActual.value = null
     }
 
@@ -127,12 +278,15 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         if (sesion.observador == codigoSupervisor) return false // RN-11
 
         return if (esRechazo) {
-            dbHelper.actualizarEstadoSesion(numeroSesion, "RECHAZADA", codigoSupervisor, motivo ?: "Sin motivo")
+            val motivoFinal = motivo ?: "Sin motivo"
+            dbHelper.actualizarEstadoSesion(numeroSesion, "RECHAZADA", codigoSupervisor, motivoFinal)
+            enviarEstado(numeroSesion, "RECHAZADA", codigoSupervisor, motivoFinal)
             true
         } else {
             val registrosValidos = dbHelper.obtenerRegistrosPorSesion(numeroSesion).count { !it.anulado }
             if (registrosValidos < 30) return false // RN-10
             dbHelper.actualizarEstadoSesion(numeroSesion, "VALIDADA", codigoSupervisor)
+            enviarEstado(numeroSesion, "VALIDADA", codigoSupervisor, null)
             true
         }
     }
@@ -221,5 +375,23 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
 
     fun guardarEvento(fecha: String, tipo: String, acceso: String, descripcion: String) {
         dbHelper.insertarEvento(fecha, tipo, acceso, descripcion)
+    }
+
+    /** Si el servidor aún no tiene la sesión (404), se envía completa. */
+    private fun enviarEstado(numero: String, estado: String, validador: String?, motivo: String?) {
+        enviarAlServidor("actualizar el estado de $numero") {
+            val resp = operacionApi.actualizarEstado(numero, CambioEstadoDto(estado, validador, motivo))
+            if (resp.code() == 404) {
+                dbHelper.obtenerSesion(numero)?.let { operacionApi.guardarSesion(SesionDto.de(it)) }
+            } else if (!resp.isSuccessful) {
+                throw IllegalStateException("HTTP ${resp.code()}")
+            }
+        }
+    }
+
+    companion object {
+        private const val TAG = "TiendaViewModel"
+        /** Contraseña del prototipo, usada solo si ms-auth no responde. */
+        private const val CONTRASENA_LOCAL = "12345"
     }
 }

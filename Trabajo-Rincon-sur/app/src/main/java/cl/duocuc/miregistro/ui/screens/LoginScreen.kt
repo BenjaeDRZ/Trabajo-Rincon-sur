@@ -19,7 +19,8 @@ import cl.duocuc.miregistro.ui.components.BotonAtras
 @Composable
 fun LoginScreen(
     onLoginExitoso: (Colaborador) -> Unit,
-    validarCodigo: (String) -> Colaborador?,
+    /** (código, contraseña, onResultado(colaborador, error)) — valida contra ms-auth */
+    iniciarSesion: (String, String, (Colaborador?, String?) -> Unit) -> Unit,
     modoTema: ModoTema,
     onCambiarModoTema: (ModoTema) -> Unit
 ) {
@@ -27,9 +28,7 @@ fun LoginScreen(
     var contrasena by remember { mutableStateOf("") }
     var contrasenaVisible by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
-
-    // Contraseña fija para todos los colaboradores (prototipo)
-    val CONTRASENA_CORRECTA = "12345"
+    var cargando by remember { mutableStateOf(false) }
 
     Surface(
         modifier = Modifier.fillMaxSize(),
@@ -122,23 +121,34 @@ fun LoginScreen(
                         when {
                             codigoLimpio.isBlank() -> error = "Ingresa tu código de colaborador"
                             contrasena.isBlank() -> error = "Ingresa tu contraseña"
-                            contrasena != CONTRASENA_CORRECTA -> error = "Contraseña incorrecta"
                             else -> {
-                                val colaborador = validarCodigo(codigoLimpio)
-                                if (colaborador != null) {
-                                    onLoginExitoso(colaborador)
-                                } else {
-                                    error = "Código no encontrado"
+                                cargando = true
+                                iniciarSesion(codigoLimpio, contrasena) { colaborador, mensaje ->
+                                    cargando = false
+                                    if (colaborador != null) {
+                                        onLoginExitoso(colaborador)
+                                    } else {
+                                        error = mensaje ?: "No se pudo iniciar sesión"
+                                    }
                                 }
                             }
                         }
                     },
+                    enabled = !cargando,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
                     shape = MaterialTheme.shapes.medium
                 ) {
-                    Text("INGRESAR", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    if (cargando) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.onPrimary
+                        )
+                    } else {
+                        Text("INGRESAR", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
 

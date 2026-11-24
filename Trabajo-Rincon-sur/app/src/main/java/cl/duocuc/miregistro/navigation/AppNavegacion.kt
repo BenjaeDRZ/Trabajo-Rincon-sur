@@ -185,23 +185,33 @@ fun AppNavegacion(
 
 
         composable(Ruta.Metas.ruta) {
-            val mensaje by tiendaViewModel.mensajeMeta.collectAsStateWithLifecycle()
+            val colab = colaboradorLogueado
+            if (colab != null) {
+                // RN-19: solo P-01 y P-02 pueden acceder a la pantalla de metas
+                if (colab.codigoPuesto == "P-01" || colab.codigoPuesto == "P-02") {
+                    val mensaje by tiendaViewModel.mensajeMeta.collectAsStateWithLifecycle()
 
-            MetaScreen(
-                onGuardar = { mes, meta ->
-                    tiendaViewModel.guardarMeta(mes, meta)
-                },
-                mensaje = mensaje,
-                onVolver = {
-                    navController.navigateUp()
-                },
-                onIrConteos = {
-                    navController.navigate(Ruta.ImportarConteos.ruta)
-                },
-                onIrTransacciones = {
-                    navController.navigate(Ruta.ImportarTransacciones.ruta)
+                    MetaScreen(
+                        colaborador = colab,
+                        onGuardar = { mes, meta ->
+                            tiendaViewModel.guardarMeta(mes, meta)
+                        },
+                        mensaje = mensaje,
+                        onVolver = {
+                            navController.navigateUp()
+                        },
+                        onIrConteos = {
+                            navController.navigate(Ruta.ImportarConteos.ruta)
+                        },
+                        onIrTransacciones = {
+                            navController.navigate(Ruta.ImportarTransacciones.ruta)
+                        }
+                    )
+                } else {
+                    // Defensa en profundidad: si un perfil sin permiso llega, lo expulsamos
+                    LaunchedEffect(Unit) { navController.navigateUp() }
                 }
-            )
+            }
         }
 
         composable(Ruta.ImportarConteos.ruta) {

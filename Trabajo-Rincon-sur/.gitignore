@@ -1,0 +1,17 @@
+# Android
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+build/
+app/build/
+
+# Spring Boot / Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# VS Code
+.vscode/

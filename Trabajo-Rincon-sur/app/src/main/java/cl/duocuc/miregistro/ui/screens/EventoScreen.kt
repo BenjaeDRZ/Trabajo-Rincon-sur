@@ -1,4 +1,4 @@
-package cl.duocuc.miregistro.ui.screens
+ package cl.duocuc.miregistro.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState

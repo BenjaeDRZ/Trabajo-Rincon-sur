@@ -1,17 +1,136 @@
 package cl.duocuc.miregistro.viewmodel
 
 import android.app.Application
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import cl.duocuc.miregistro.data.TiendaDbHelper
+import cl.duocuc.miregistro.data.remote.CambioEstadoDto
+import cl.duocuc.miregistro.data.remote.LoginRequestDto
+import cl.duocuc.miregistro.data.remote.RegistroDto
+import cl.duocuc.miregistro.data.remote.RetrofitClient
+import cl.duocuc.miregistro.data.remote.SesionDto
 import cl.duocuc.miregistro.model.*
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import cl.duocuc.miregistro.data.remote.ReportesRetrofitInstance
+import cl.duocuc.miregistro.model.Meta
+import kotlinx.coroutines.launch
+import cl.duocuc.miregistro.model.ConteoApi
+import cl.duocuc.miregistro.data.remote.AnaliticaRetrofitInstance
+import cl.duocuc.miregistro.model.TransaccionApi
+
+
 
 class TiendaViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val _mensajeMeta = MutableStateFlow<String?>(null)
+    val mensajeMeta: StateFlow<String?> = _mensajeMeta
+
+    fun guardarMeta(mes: String, metaConversion: Double) {
+        viewModelScope.launch {
+            try {
+                _mensajeMeta.value = "Guardando..."
+                val nuevaMeta = Meta(mes = mes, metaConversion = metaConversion)
+                ReportesRetrofitInstance.api.crearMeta(nuevaMeta)
+                _mensajeMeta.value = "✅ ¡Meta guardada exitosamente en MySQL!"
+            } catch (e: Exception) {
+                _mensajeMeta.value = "❌ Error: ${e.message}"
+            }
+        }
+    }
+
+
+    fun importarConteosSimulados() {
+        viewModelScope.launch {
+            try {
+                _mensajeMeta.value = "Importando conteos..."
+
+                val listaConteos = listOf(
+                    ConteoApi(
+                        fecha = "2026-09-15",
+                        acceso = "A1",
+                        bloque = "13:00",
+                        cantidad = 200
+                    ),
+                    ConteoApi(
+                        fecha = "2026-09-15",
+                        acceso = "A4",
+                        bloque = "13:00",
+                        cantidad = 500
+                    ),
+                    ConteoApi(
+                        fecha = "2026-09-15",
+                        acceso = "A3",
+                        bloque = "14:00",
+                        cantidad = 150
+                    )
+                )
+
+                val respuesta = withContext(Dispatchers.IO) {
+                    AnaliticaRetrofitInstance.api
+                        .cargarConteos(listaConteos)
+                        .string()
+                }
+
+                _mensajeMeta.value = "✅ $respuesta"
+
+            } catch (e: Exception) {
+                _mensajeMeta.value = "❌ Error: ${e.message}"
+                Log.e(TAG, "Error importando conteos", e)
+            }
+        }
+    }
+
+    fun importarTransaccionesSimuladas() {
+        viewModelScope.launch {
+            try {
+                _mensajeMeta.value = "Importando transacciones..."
+
+                val listaTransacciones = listOf(
+                    TransaccionApi(
+                        acceso = "A1",
+                        bloque = "13:00",
+                        cantidad = 35,
+                        fecha = "2026-09-15"
+                    ),
+                    TransaccionApi(
+                        acceso = "A4",
+                        bloque = "13:00",
+                        cantidad = 52,
+                        fecha = "2026-09-15"
+                    ),
+                    TransaccionApi(
+                        acceso = "A3",
+                        bloque = "14:00",
+                        cantidad = 18,
+                        fecha = "2026-09-15"
+                    )
+                )
+
+                val respuesta = withContext(Dispatchers.IO) {
+                    AnaliticaRetrofitInstance.api
+                        .cargarTransacciones(listaTransacciones)
+                        .string()
+                }
+
+                _mensajeMeta.value = "✅ $respuesta"
+
+            } catch (e: Exception) {
+                _mensajeMeta.value = "❌ Error: ${e.message}"
+                Log.e(TAG, "Error importando transacciones", e)
+            }
+        }
+    }
+
+
 
     private val dbHelper = TiendaDbHelper(application.applicationContext)
 
@@ -24,17 +143,153 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
     private val _registros = MutableStateFlow<List<RegistroPersona>>(emptyList())
     val registros: StateFlow<List<RegistroPersona>> = _registros
 
+    
+    private val _servidorConectado = MutableStateFlow(false)
+    val servidorConectado: StateFlow<Boolean> = _servidorConectado
+
+    private val _historial = MutableStateFlow<List<Sesion>>(emptyList())
+    val historial: StateFlow<List<Sesion>> = _historial
+
+    private val operacionApi get() = RetrofitClient.operacion
+
     init {
         dbHelper.crearSesionDePrueba()
+        sincronizarConServidor()
+        cargarHistorial()
     }
 
     fun validarColaborador(codigo: String): Colaborador? =
         colaboradores.find { it.codigo == codigo }
 
+    /**
+     * Login contra ms-auth. Si el microservicio no responde (sin red / apagado),
+     * se usa la lista local del prototipo (contraseña 12345) para no bloquear el trabajo en terreno.
+     * onResultado(colaborador, mensajeError)
+     */
+    fun iniciarSesion(codigo: String, contrasena: String, onResultado: (Colaborador?, String?) -> Unit) {
+        viewModelScope.launch {
+            val resultado = withContext(Dispatchers.IO) {
+                try {
+                    val resp = RetrofitClient.auth.login(LoginRequestDto(codigo, contrasena))
+                    _servidorConectado.value = true
+                    when {
+                        resp.isSuccessful && resp.body() != null -> resp.body()!!.aModelo() to null
+                        resp.code() == 401 -> null to "Código o contraseña incorrectos"
+                        else -> loginLocal(codigo, contrasena)
+                    }
+                } catch (e: Exception) {
+                    Log.w(TAG, "ms-auth no disponible, se usa login local: ${e.message}")
+                    _servidorConectado.value = false
+                    loginLocal(codigo, contrasena)
+                }
+            }
+            onResultado(resultado.first, resultado.second)
+        }
+    }
+
+    private fun loginLocal(codigo: String, contrasena: String): Pair<Colaborador?, String?> {
+        val colaborador = validarColaborador(codigo) ?: return null to "Código no encontrado"
+        if (contrasena != CONTRASENA_LOCAL) return null to "Contraseña incorrecta"
+        return colaborador to null
+    }
+
     fun cargarSesionObservador(codigoObservador: String) {
         val sesion = dbHelper.obtenerSesionProgramada(codigoObservador)
         _sesionActual.value = sesion
         _registros.value = if (sesion != null) dbHelper.obtenerRegistrosPorSesion(sesion.numero) else emptyList()
+    }
+
+
+
+
+
+
+
+    
+    private fun enviarAlServidor(descripcion: String, accion: suspend () -> Unit) {
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                accion()
+                _servidorConectado.value = true
+            } catch (e: Exception) {
+                _servidorConectado.value = false
+                Log.w(TAG, "No se pudo $descripcion (queda pendiente para la próxima sincronización): ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Sube a ms-operacion lo que solo existe localmente y baja lo que hay en el servidor
+     * (sesiones programadas por otros dispositivos, validaciones, etc.).
+     */
+    fun sincronizarConServidor(onListo: () -> Unit = {}) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val remotas = operacionApi.listarSesiones().mapNotNull { it.aModelo() }.associateBy { it.numero }
+                    val locales = dbHelper.obtenerTodasLasSesiones().associateBy { it.numero }
+
+                    for (local in locales.values) {
+                        val remota = remotas[local.numero]
+                        if (remota == null || nivelEstado(local.estado) > nivelEstado(remota.estado)) {
+                            operacionApi.guardarSesion(SesionDto.de(local))
+                        }
+                        val regsLocales = dbHelper.obtenerRegistrosPorSesion(local.numero)
+                        val regsRemotos = if (remota == null) 0 else operacionApi.registrosDeSesion(local.numero).size
+                        if (regsLocales.size > regsRemotos) {
+                            regsLocales.forEach { operacionApi.guardarRegistro(RegistroDto.de(it)) }
+                        }
+                    }
+
+                    for (remota in remotas.values) {
+                        val local = locales[remota.numero]
+                        if (local == null || nivelEstado(remota.estado) > nivelEstado(local.estado)) {
+                            dbHelper.guardarSesionDesdeServidor(remota)
+                        }
+                        if (remota.estado != "PROGRAMADA") {
+                            val regsRemotos = operacionApi.registrosDeSesion(remota.numero).mapNotNull { it.aModelo() }
+                            if (regsRemotos.size > dbHelper.obtenerRegistrosPorSesion(remota.numero).size) {
+                                dbHelper.reemplazarRegistrosDeSesion(remota.numero, regsRemotos)
+                            }
+                        }
+                    }
+                    _servidorConectado.value = true
+                } catch (e: Exception) {
+                    _servidorConectado.value = false
+                    Log.w(TAG, "Sincronización con ms-operacion falló, se trabaja offline: ${e.message}")
+                }
+            }
+            onListo()
+        }
+    }
+
+    private fun nivelEstado(estado: String?): Int = when (estado) {
+        "PROGRAMADA" -> 0
+        "EN_CURSO" -> 1
+        "FINALIZADA" -> 2
+        "VALIDADA", "RECHAZADA" -> 3
+        else -> -1
+    }
+
+    /**
+     * Trae desde ms-analitica los ingresos por acceso de la fecha, los guarda localmente
+     * y luego entrega las métricas calculadas. Si el servidor no responde, usa lo local.
+     */
+    fun cargarMetricasDia(fecha: String, onListo: (Map<String, Any>) -> Unit) {
+        viewModelScope.launch {
+            val metricas = withContext(Dispatchers.IO) {
+                try {
+                    val porAcceso = RetrofitClient.analitica.ingresosPorAcceso(fecha)
+                    if (porAcceso.isNotEmpty()) dbHelper.reemplazarConteos(fecha, porAcceso)
+                    _servidorConectado.value = true
+                } catch (e: Exception) {
+                    _servidorConectado.value = false
+                    Log.w(TAG, "ms-analitica no disponible, se usan conteos locales: ${e.message}")
+                }
+                obtenerMetricasDia(fecha)
+            }
+            onListo(metricas)
+        }
     }
 
     /**
@@ -59,6 +314,7 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         }
         val nuevaSesion = Sesion(numero, acceso, fecha, horaInicio, horaTermino, observador, "PROGRAMADA")
         dbHelper.insertarSesion(nuevaSesion)
+        enviarAlServidor("enviar la sesión $numero") { operacionApi.guardarSesion(SesionDto.de(nuevaSesion)) }
         return Result.success(Unit)
     }
 
@@ -96,6 +352,7 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         val nuevoRegistro = RegistroPersona(nuevoNumero, sesion.numero, horaActual, clasificacion, rangoEtario, compania, traeCompras, accesoDestino)
         _registros.value = _registros.value + nuevoRegistro
         dbHelper.insertarRegistro(nuevoRegistro)
+        enviarAlServidor("enviar el registro $nuevoNumero") { operacionApi.guardarRegistro(RegistroDto.de(nuevoRegistro)) }
     }
 
     fun anularUltimoRegistro() {
@@ -104,12 +361,16 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
             val ultimo = listaActual.removeAt(listaActual.size - 1)
             _registros.value = listaActual
             dbHelper.anularRegistro(ultimo.numero)
+            enviarAlServidor("anular el registro ${ultimo.numero}") {
+                operacionApi.anularRegistro(ultimo.sesion, ultimo.numero)
+            }
         }
     }
 
     fun finalizarSesionActual() {
         val sesion = _sesionActual.value ?: return
         dbHelper.actualizarEstadoSesion(sesion.numero, "FINALIZADA")
+        enviarEstado(sesion.numero, "FINALIZADA", null, null)
         _sesionActual.value = null
     }
 
@@ -127,17 +388,20 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
         if (sesion.observador == codigoSupervisor) return false // RN-11
 
         return if (esRechazo) {
-            dbHelper.actualizarEstadoSesion(numeroSesion, "RECHAZADA", codigoSupervisor, motivo ?: "Sin motivo")
+            val motivoFinal = motivo ?: "Sin motivo"
+            dbHelper.actualizarEstadoSesion(numeroSesion, "RECHAZADA", codigoSupervisor, motivoFinal)
+            enviarEstado(numeroSesion, "RECHAZADA", codigoSupervisor, motivoFinal)
             true
         } else {
             val registrosValidos = dbHelper.obtenerRegistrosPorSesion(numeroSesion).count { !it.anulado }
             if (registrosValidos < 30) return false // RN-10
             dbHelper.actualizarEstadoSesion(numeroSesion, "VALIDADA", codigoSupervisor)
+            enviarEstado(numeroSesion, "VALIDADA", codigoSupervisor, null)
             true
         }
     }
 
-    /** RN-13: proporción de tránsito (excluye NO_DETERMINADO del denominador) */
+    
     fun calcularProporcionTransito(registros: List<RegistroPersona>): Double {
         val validos = registros.filter { !it.anulado && it.clasificacion != "NO_DETERMINADO" }
         if (validos.isEmpty()) return 0.0
@@ -221,5 +485,47 @@ class TiendaViewModel(application: Application) : AndroidViewModel(application) 
 
     fun guardarEvento(fecha: String, tipo: String, acceso: String, descripcion: String) {
         dbHelper.insertarEvento(fecha, tipo, acceso, descripcion)
+    }
+
+    
+    private fun enviarEstado(numero: String, estado: String, validador: String?, motivo: String?) {
+        enviarAlServidor("actualizar el estado de $numero") {
+            val resp = operacionApi.actualizarEstado(numero, CambioEstadoDto(estado, validador, motivo))
+            if (resp.code() == 404) {
+                dbHelper.obtenerSesion(numero)?.let { operacionApi.guardarSesion(SesionDto.de(it)) }
+            } else if (!resp.isSuccessful) {
+                throw IllegalStateException("HTTP ${resp.code()}")
+            }
+        }
+    }
+
+    /**
+     * Carga las sesiones para la pantalla de historial.
+     * Intenta traerlas del backend y las guarda en SQLite. Si falla, usa lo local.
+     * Siempre termina leyendo de SQLite, que es la fuente de la UI.
+     */
+    fun cargarHistorial() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                try {
+                    val remotas = operacionApi.listarSesiones().mapNotNull { it.aModelo() }
+                    remotas.forEach { dbHelper.guardarSesionDesdeServidor(it) }
+                    _servidorConectado.value = true
+                } catch (e: Exception) {
+                    _servidorConectado.value = false
+                    Log.w(TAG, "Historial offline, se usa SQLite local: ${e.message}")
+                }
+            }
+            _historial.value = withContext(Dispatchers.IO) {
+                dbHelper.obtenerTodasLasSesiones()
+            }
+            Log.d(TAG, "Historial cargado: ${_historial.value.size} sesiones")
+        }
+    }
+
+    companion object {
+        private const val TAG = "TiendaViewModel"
+        
+        private const val CONTRASENA_LOCAL = "12345"
     }
 }

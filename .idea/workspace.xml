@@ -4,19 +4,7 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="e461e134-ef32-41da-a1f7-c6b3d22fdd9b" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/components/BotonAtras.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/.gitignore" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/navigation/AppNavegacion.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/navigation/AppNavegacion.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/EventoScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/EventoScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/IndicadoresScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/IndicadoresScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/LoginScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/LoginScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/MenuPrincipalScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/MenuPrincipalScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/ObservadorScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/ObservadorScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/ProgramarSesionScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/ProgramarSesionScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/SupervisorScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/SupervisorScreen.kt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/UbicacionScreen.kt" beforeDir="false" afterPath="$PROJECT_DIR$/Trabajo-Rincon-sur/app/src/main/java/cl/duocuc/miregistro/ui/screens/UbicacionScreen.kt" afterDir="false" />
-    </list>
+    <list default="true" id="e461e134-ef32-41da-a1f7-c6b3d22fdd9b" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -26,12 +14,12 @@
     <option name="formatViaClangd" value="false" />
   </component>
   <component name="Git.Settings">
-    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$/Trabajo-Rincon-sur" />
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3,
-  "fromUser": false
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3,
+  &quot;fromUser&quot;: false
+}</component>
   <component name="ProjectId" id="3MRLi6AEpOe0f31je0KSedg7gVF" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
@@ -49,7 +37,7 @@
     "cidr.known.project.marker": "true",
     "git-widget-placeholder": "master",
     "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/Bendz/Documents/bendz/trabajos/Proyecto_RinconSur"
+    "last_opened_file_path": "C:/Users/Bendz/Documents/bendz/trabajos/Trabajo-Rincon-sur-final"
   }
 }]]></component>
   <component name="TaskManager">

@@ -52,7 +52,6 @@ fun IndicadoresScreen(
 
             Text("Resumen del día: $fechaActual", color = MaterialTheme.colorScheme.onBackground, fontWeight = FontWeight.Medium)
 
-            // --- Flujo y ventas ---
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Flujo y Ventas", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
@@ -72,7 +71,6 @@ fun IndicadoresScreen(
                 }
             }
 
-            // --- Ingresos por acceso ---
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Ingresos por Acceso", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
@@ -85,12 +83,10 @@ fun IndicadoresScreen(
                 }
             }
 
-            // --- Análisis de tránsito ---
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Análisis de Tránsito", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)
 
-                    // Chip de estado (medido / estimado / sin info)
                     val (etiquetaEstado, colorEstado) = when (estadoTransito) {
                         "MEDIDO" -> "✓ Medido" to MaterialTheme.colorScheme.primary
                         "ESTIMADO" -> "≈ Estimado" to MaterialTheme.colorScheme.tertiary
@@ -131,7 +127,6 @@ fun IndicadoresScreen(
                 }
             }
 
-            // --- Perfil del tránsito ---
             Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
                 Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("Perfil del Tránsito (RF-11)", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.primary)

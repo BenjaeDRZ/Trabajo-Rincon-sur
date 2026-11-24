@@ -14,6 +14,9 @@ import cl.duocuc.miregistro.model.Colaborador
 import cl.duocuc.miregistro.model.ModoTema
 import cl.duocuc.miregistro.ui.screens.*
 import cl.duocuc.miregistro.viewmodel.TiendaViewModel
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
 fun AppNavegacion(
@@ -44,15 +47,14 @@ fun AppNavegacion(
                         popUpTo(Ruta.Login.ruta) { inclusive = true }
                     }
                 },
-                validarCodigo = tiendaViewModel::validarColaborador,
+                iniciarSesion = tiendaViewModel::iniciarSesion,
                 modoTema = modoTema,
                 onCambiarModoTema = onCambiarModoTema
             )
         }
 
-        // ============================================
-        // MENÚ PRINCIPAL — back pide confirmar cierre de sesión
-        // ============================================
+
+
         composable(Ruta.MenuPrincipal.ruta) {
             val colab = colaboradorLogueado
             if (colab != null) {
@@ -70,18 +72,37 @@ fun AppNavegacion(
                 MenuPrincipalScreen(
                     colaborador = colab,
                     onAtras = { mostrarDialogoCerrarSesion = true },
+                    onVerMetas = { navController.navigate(Ruta.Metas.ruta) },
+                    onImportarConteos = { navController.navigate(Ruta.ImportarConteos.ruta) },
+                    onImportarTransacciones = { navController.navigate(Ruta.ImportarTransacciones.ruta) },
+                    onVerHistorial = { navController.navigate(Ruta.Historial.ruta) },
+                    onVerColaboradores = { navController.navigate(Ruta.Colaboradores.ruta) },
+
                     onVerObservador = {
                         tiendaViewModel.cargarSesionObservador(colab.codigo)
                         navController.navigate(Ruta.Observador.ruta)
+
+                        tiendaViewModel.sincronizarConServidor {
+                            if (tiendaViewModel.sesionActual.value == null) {
+                                tiendaViewModel.cargarSesionObservador(colab.codigo)
+                            }
+                        }
                     },
                     onVerSupervisor = {
                         sesionParaRevisar = tiendaViewModel.obtenerSesionParaRevisar()
                         registrosParaRevisar = tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")
                         navController.navigate(Ruta.Supervisor.ruta)
+
+                        tiendaViewModel.sincronizarConServidor {
+                            sesionParaRevisar = tiendaViewModel.obtenerSesionParaRevisar()
+                            registrosParaRevisar = tiendaViewModel.obtenerRegistrosDeSesion(sesionParaRevisar?.numero ?: "")
+                        }
                     },
                     onVerIndicadores = {
                         metricasDia = tiendaViewModel.obtenerMetricasDia(fechaConsulta)
                         navController.navigate(Ruta.Indicadores.ruta)
+
+                        tiendaViewModel.cargarMetricasDia(fechaConsulta) { metricasDia = it }
                     },
                     onVerEventos = { navController.navigate(Ruta.Eventos.ruta) },
                     onProgramarSesion = { navController.navigate(Ruta.ProgramarSesion.ruta) },
@@ -110,9 +131,8 @@ fun AppNavegacion(
             }
         }
 
-        // ============================================
-        // OBSERVADOR — back pide confirmar salida de sesión
-        // ============================================
+
+
         composable(Ruta.Observador.ruta) {
             val colab = colaboradorLogueado
             if (colab != null) {
@@ -163,9 +183,73 @@ fun AppNavegacion(
             }
         }
 
-        // ============================================
-        // SUPERVISOR — back normal
-        // ============================================
+
+        composable(Ruta.Metas.ruta) {
+            val mensaje by tiendaViewModel.mensajeMeta.collectAsStateWithLifecycle()
+
+            MetaScreen(
+                onGuardar = { mes, meta ->
+                    tiendaViewModel.guardarMeta(mes, meta)
+                },
+                mensaje = mensaje,
+                onVolver = {
+                    navController.navigateUp()
+                },
+                onIrConteos = {
+                    navController.navigate(Ruta.ImportarConteos.ruta)
+                },
+                onIrTransacciones = {
+                    navController.navigate(Ruta.ImportarTransacciones.ruta)
+                }
+            )
+        }
+
+        composable(Ruta.ImportarConteos.ruta) {
+            val mensaje by tiendaViewModel.mensajeMeta.collectAsStateWithLifecycle()
+
+            ImportarConteosScreen(
+                mensaje = mensaje,
+                onImportar = {
+                    tiendaViewModel.importarConteosSimulados()
+                },
+                onVolver = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+        composable(Ruta.ImportarTransacciones.ruta) {
+            val mensaje by tiendaViewModel.mensajeMeta.collectAsStateWithLifecycle()
+
+            ImportarTransaccionesScreen(
+                mensaje = mensaje,
+                onImportar = {
+                    tiendaViewModel.importarTransaccionesSimuladas()
+                },
+                onVolver = {
+                    navController.navigateUp()
+                }
+            )
+        }
+
+
+        composable(Ruta.Historial.ruta) {
+            val sesiones by tiendaViewModel.historial.collectAsStateWithLifecycle()
+
+            LaunchedEffect(Unit) { tiendaViewModel.cargarHistorial() }
+
+            HistorialScreen(
+                sesiones = sesiones,
+                onVolver = { navController.navigateUp() }
+            )
+        }
+
+        composable(Ruta.Colaboradores.ruta) {
+            ColaboradoresScreen(onVolver = { navController.navigateUp() })
+        }
+
+
+
         composable(Ruta.Supervisor.ruta) {
             val colab = colaboradorLogueado
             if (colab != null) {
@@ -189,9 +273,8 @@ fun AppNavegacion(
             }
         }
 
-        // ============================================
-        // PROGRAMAR SESIÓN — back normal
-        // ============================================
+
+
         composable(Ruta.ProgramarSesion.ruta) {
             BackHandler { navController.navigateUp() }
 
@@ -203,9 +286,8 @@ fun AppNavegacion(
             )
         }
 
-        // ============================================
-        // INDICADORES — back normal
-        // ============================================
+
+
         composable(Ruta.Indicadores.ruta) {
             BackHandler { navController.navigateUp() }
 
@@ -215,14 +297,14 @@ fun AppNavegacion(
                 onFechaCambiada = { nuevaFecha ->
                     fechaConsulta = nuevaFecha
                     metricasDia = tiendaViewModel.obtenerMetricasDia(nuevaFecha)
+                    tiendaViewModel.cargarMetricasDia(nuevaFecha) { metricasDia = it }
                 },
                 onVolver = { navController.navigateUp() }
             )
         }
 
-        // ============================================
-        // EVENTOS — back normal
-        // ============================================
+
+
         composable(Ruta.Eventos.ruta) {
             BackHandler { navController.navigateUp() }
 
@@ -234,9 +316,8 @@ fun AppNavegacion(
             )
         }
 
-        // ============================================
-        // UBICACIÓN — back normal
-        // ============================================
+
+
         composable(Ruta.Ubicacion.ruta) {
             BackHandler { navController.navigateUp() }
             UbicacionScreen(onVolver = { navController.navigateUp() })
